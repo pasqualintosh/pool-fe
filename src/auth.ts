@@ -29,3 +29,29 @@ export function clearIdentity() {
     /* ignore */
   }
 }
+
+const CREATOR_UUIDS_KEY = 'pool-fe:creator-uuids';
+
+function loadCreatorUuids(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(CREATOR_UUIDS_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The uuid proving this browser created `sessionId`, if it did. */
+export function getCreatorUuid(sessionId: string): string | null {
+  return loadCreatorUuids()[sessionId] ?? null;
+}
+
+export function saveCreatorUuid(sessionId: string, uuid: string) {
+  try {
+    const uuids = loadCreatorUuids();
+    uuids[sessionId] = uuid;
+    localStorage.setItem(CREATOR_UUIDS_KEY, JSON.stringify(uuids));
+  } catch {
+    /* ignore */
+  }
+}

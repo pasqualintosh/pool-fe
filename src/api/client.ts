@@ -2,6 +2,7 @@ import type {
   ImportResponse,
   JoinResponse,
   SessionResults,
+  SessionUpdate,
   Vote,
   VoteUpdate,
   VotingSession,
@@ -50,9 +51,10 @@ async function api<T>(path: string, init: RequestInit = {}, username?: string): 
 
 export const normalizeSessionId = (id: string) => id.trim().toUpperCase();
 
-export const importCsv = (file: File, name?: string) => {
+export const importCsv = (file: File, uuid: string, name?: string) => {
   const form = new FormData();
   form.append('file', file);
+  form.append('uuid', uuid);
   if (name?.trim()) form.append('name', name.trim());
   return api<ImportResponse>('/api/sessions/import', { method: 'POST', body: form });
 };
@@ -72,5 +74,10 @@ export const getMyVotes = (sessionId: string, username: string) =>
 export const updateVote = (voteId: string, username: string, update: VoteUpdate) =>
   api<Vote>(`/api/votes/${voteId}`, { method: 'PATCH', body: JSON.stringify(update) }, username);
 
-export const getResults = (sessionId: string) =>
-  api<SessionResults>(`/api/sessions/${sessionId}/results`);
+export const updateSession = (sessionId: string, update: SessionUpdate) =>
+  api<VotingSession>(`/api/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify(update) });
+
+export const getResults = (sessionId: string, creatorUuid?: string | null) => {
+  const query = creatorUuid ? `?uuid=${encodeURIComponent(creatorUuid)}` : '';
+  return api<SessionResults>(`/api/sessions/${sessionId}/results${query}`);
+};

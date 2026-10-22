@@ -175,11 +175,13 @@ Carica il CSV delle CFP (export di Google Forms), crea i record CFP e una nuova 
 
 `multipart/form-data`:
 - `file` (obbligatorio): il CSV, max 4 MB
+- `uuid` (obbligatorio): un identificatore generato dal frontend (es. `crypto.randomUUID()`) **prima** della richiesta. Salvatelo in `localStorage`: è il segreto che identifica chi ha creato la sessione e serve per vedere i voti non anonimizzati in `/results` (vedi sotto). Non viene mai restituito da nessuna risposta, quindi se lo perdete non è recuperabile.
 - `name` (opzionale): nome leggibile della sessione
 
 ```bash
 curl -X POST http://localhost:3000/api/sessions/import \
   -F "name=CFP Panormous 2026" \
+  -F "uuid=$(uuidgen)" \
   -F "file=@cfp.csv"
 ```
 
@@ -230,7 +232,13 @@ Chiude o riapre una sessione e/o la rinomina.
 ### `GET /api/sessions/:sessionId/results`
 
 Classifica aggregata → `SessionResults`. Le medie ignorano i criteri `null`.
-Ogni `CfpResult` include anche `total_score` (somma di tutti i punteggi di tutti i votanti) e `votes` (i criteri votati da ciascun partecipante, ordinati per username).
+Ogni `CfpResult` include anche `total_score` (somma di tutti i punteggi di tutti i votanti) e `votes` (i singoli punteggi dati a quella CFP, **anonimizzati** di default: nessun campo username, solo i criteri).
+
+Query param opzionale `uuid`: se corrisponde allo `uuid` passato all'`/import` di questa sessione (quello salvato in `localStorage` da chi l'ha creata), ogni voce di `votes` include anche `username` — solo chi ha creato la sessione può quindi vedere chi ha votato cosa.
+
+```
+GET /api/sessions/:sessionId/results?uuid=<quello salvato in localStorage>
+```
 
 ---
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { getResults, joinSession, normalizeSessionId, updateVote } from '../api/client';
-import { clearIdentity, loadIdentity } from '../auth';
+import { getResults, joinSession, normalizeSessionId, updateSession, updateVote } from '../api/client';
+import { clearIdentity, getCreatorUuid, loadIdentity } from '../auth';
 import {
   CRITERIA,
   CRITERIA_MAX,
@@ -12,7 +12,6 @@ import {
   type VotingSession,
 } from '../api/types';
 
-const RANGE = Array.from({ length: CRITERIA_MAX - CRITERIA_MIN + 1 }, (_, i) => i + CRITERIA_MIN);
 const label = (k: string) => `Criterio ${k.split('_')[1]}`;
 
 export default function VotingPage() {
@@ -25,14 +24,17 @@ export default function VotingPage() {
   const [results, setResults] = useState<SessionResults | null>(null);
   const [resultsError, setResultsError] = useState<string | null>(null);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
 
   const username = identity?.sessionId === sessionId ? identity.username : null;
+  const isCreator = Boolean(getCreatorUuid(sessionId));
 
   const refreshResults = useCallback(async () => {
     setLoadingResults(true);
     setResultsError(null);
     try {
-      setResults(await getResults(sessionId));
+      setResults(await getResults(sessionId, getCreatorUuid(sessionId)));
     } catch (e) {
       setResultsError((e as Error).message);
     } finally {
@@ -61,6 +63,19 @@ export default function VotingPage() {
   function replaceVote(v: Vote) {
     setVotes((prev) => prev.map((x) => (x._id === v._id ? v : x)));
     refreshResults();
+  }
+
+  async function closeSession() {
+    setClosing(true);
+    setCloseError(null);
+    try {
+      setSession(await updateSession(sessionId, { status: 'closed' }));
+      refreshResults();
+    } catch (e) {
+      setCloseError((e as Error).message);
+    } finally {
+      setClosing(false);
+    }
   }
 
   return (
@@ -92,12 +107,31 @@ export default function VotingPage() {
       <section className="card results">
         <div className="results-head">
           <h2>Risultati</h2>
-          <button onClick={refreshResults} disabled={loadingResults}>
-            {loadingResults ? 'Aggiorno…' : 'Aggiorna risultati'}
-          </button>
+          {closed && (
+            <button onClick={refreshResults} disabled={loadingResults}>
+              {loadingResults ? 'Aggiorno…' : 'Aggiorna risultati'}
+            </button>
+          )}
         </div>
-        {resultsError && <p className="error">{resultsError}</p>}
-        {results && <ResultsTable results={results} />}
+        {!closed && (
+          <>
+            <p className="muted">I risultati saranno visibili dopo la chiusura della sessione.</p>
+            {isCreator && (
+              <>
+                <button className="primary" onClick={closeSession} disabled={closing}>
+                  {closing ? 'Chiudo…' : 'Chiudi sessione'}
+                </button>
+                {closeError && <p className="error">{closeError}</p>}
+              </>
+            )}
+          </>
+        )}
+        {closed && (
+          <>
+            {resultsError && <p className="error">{resultsError}</p>}
+            {results && <ResultsTable results={results} showVoters={isCreator} />}
+          </>
+        )}
       </section>
     </>
   );
@@ -126,7 +160,10 @@ function CfpRow({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ready = CRITERIA.every((k) => draft[k] !== null);
+  const ready = CRITERIA.every((k) => {
+    const v = draft[k];
+    return v !== null && v >= CRITERIA_MIN && v <= CRITERIA_MAX;
+  });
 
   async function submit() {
     setBusy(true);
@@ -154,18 +191,15 @@ function CfpRow({
         {CRITERIA.map((k) => (
           <label key={k}>
             {label(k)}
-            <select
+            <input
+              type="number"
+              step={1}
+              min={CRITERIA_MIN}
+              max={CRITERIA_MAX}
               value={draft[k] ?? ''}
               disabled={locked}
               onChange={(e) => setDraft({ ...draft, [k]: e.target.value ? Number(e.target.value) : null })}
-            >
-              <option value="">—</option>
-              {RANGE.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
+            />
           </label>
         ))}
         {error && <p className="error">{error}</p>}
@@ -201,8 +235,7 @@ function CfpRow({
   );
 }
 
-function ResultsTable({ results }: { results: SessionResults }) {
-  const fmt = (n: number | null) => (n === null ? '—' : n.toFixed(2));
+function ResultsTable({ results, showVoters }: { results: SessionResults; showVoters: boolean }) {
   const sum = (v: Criteria) => CRITERIA.reduce((a, k) => a + (v[k] ?? 0), 0);
   return (
     <div className="table-wrap">
@@ -214,7 +247,6 @@ function ResultsTable({ results }: { results: SessionResults }) {
               <th key={k}>{label(k)}</th>
             ))}
             <th>Somma</th>
-            <th>Media</th>
           </tr>
         </thead>
         {results.results.map((r) => (
@@ -224,24 +256,18 @@ function ResultsTable({ results }: { results: SessionResults }) {
                 <strong>{r.cfp.title}</strong>
                 {r.cfp.full_name && <div className="muted">{r.cfp.full_name}</div>}
               </td>
-              {CRITERIA.map((k) => (
-                <td key={k}>{fmt(r[`${k}_avg` as const])}</td>
-              ))}
+              {CRITERIA.map((k) => <td key={k} />)}
               <td>
                 <strong>{r.total_score}</strong>
               </td>
-              <td>
-                <strong>{fmt(r.average_score)}</strong>
-              </td>
             </tr>
-            {r.votes.map((v) => (
+            {showVoters && r.votes.map((v) => (
               <tr key={v.username} className="voter-row">
                 <td>↳ {v.username}</td>
                 {CRITERIA.map((k) => (
                   <td key={k}>{v[k] ?? '—'}</td>
                 ))}
                 <td>{sum(v)}</td>
-                <td />
               </tr>
             ))}
           </tbody>

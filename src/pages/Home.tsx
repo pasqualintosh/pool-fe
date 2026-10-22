@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSession, importCsv, normalizeSessionId } from '../api/client';
+import { saveCreatorUuid } from '../auth';
 
 type Tab = 'import' | 'code';
 
@@ -76,7 +77,9 @@ function ImportForm() {
     setError(null);
     setBusy(true);
     try {
-      const res = await importCsv(file, name);
+      const uuid = crypto.randomUUID();
+      const res = await importCsv(file, uuid, name);
+      saveCreatorUuid(res.session_id, uuid);
       navigate(`/join/${res.session_id}`);
     } catch (err) {
       setError((err as Error).message);
