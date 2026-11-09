@@ -12,7 +12,14 @@ import {
   type VotingSession,
 } from '../api/types';
 
-const label = (k: string) => `Criterio ${k.split('_')[1]}`;
+const CRITERIA_LABELS: Record<string, string> = {
+  criteria_1: 'Rilevanza per il pubblico',
+  criteria_2: 'Qualità del contenuto',
+  criteria_3: 'Originalità',
+  criteria_4: 'Esperienza del relatore',
+};
+
+const label = (k: string) => CRITERIA_LABELS[k] ?? k;
 
 export default function VotingPage() {
   const sessionId = normalizeSessionId(useParams().sessionId ?? '');
