@@ -13,10 +13,10 @@ import {
 } from '../api/types';
 
 const CRITERIA_LABELS: Record<string, string> = {
-  criteria_1: 'Rilevanza per il pubblico',
-  criteria_2: 'Qualità del contenuto',
-  criteria_3: 'Originalità',
-  criteria_4: 'Esperienza del relatore',
+  criteria_1: 'Inerenza e Pertinenza',
+  criteria_2: 'Esperienza e Autorevolezza',
+  criteria_3: 'Innovazione e Originalità',
+  criteria_4: `Chiarezza dell'Abstract`,
 };
 
 const label = (k: string) => CRITERIA_LABELS[k] ?? k;
