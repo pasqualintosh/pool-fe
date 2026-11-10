@@ -8,7 +8,7 @@ export type SessionStatus = 'open' | 'closed';
 export const CRITERIA = ['criteria_1', 'criteria_2', 'criteria_3', 'criteria_4'] as const;
 export type CriterionKey = (typeof CRITERIA)[number];
 export const CRITERIA_MIN = 1;
-export const CRITERIA_MAX = 10;
+export const CRITERIA_MAX = 5;
 
 /** Integer between CRITERIA_MIN and CRITERIA_MAX, or null when not voted yet. */
 export type CriterionValue = number | null;
